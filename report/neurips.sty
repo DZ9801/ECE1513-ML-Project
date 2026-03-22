@@ -1,0 +1,78 @@
+% neurips.sty — Simplified NeurIPS style for course reports
+% Based on the NeurIPS 2023 style file (neurips_2023.sty)
+
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{neurips}[2023/05/01 NeurIPS style for course reports]
+
+\newif\if@neuripsfinal\@neuripsfinalfalse
+\DeclareOption{final}{\@neuripsfinaltrue}
+\DeclareOption{nonatbib}{}
+\DeclareOption{preprint}{}
+\ProcessOptions\relax
+
+% Page geometry
+\RequirePackage[letterpaper,
+  textwidth=6.5in,
+  textheight=9in,
+  top=1in,
+  marginparwidth=0.5in]{geometry}
+
+% Fonts
+\RequirePackage{natbib}
+\RequirePackage{times}
+
+% Line spacing
+\linespread{1.05}
+
+% Paragraph indentation and spacing
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+% Section formatting
+\RequirePackage{titlesec}
+\titleformat{\section}{\large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\normalsize\itshape}{\thesubsubsection}{1em}{}
+
+% Title formatting
+\def\@maketitle{%
+  \newpage
+  \null
+  \vskip 2em%
+  \begin{center}%
+    {\Large\bfseries \@title \par}%
+    \vskip 1.5em%
+    {\normalsize
+      \lineskip .5em%
+      \begin{tabular}[t]{c}%
+        \@author
+      \end{tabular}\par}%
+    \vskip 1em%
+    {\small \@date}%
+  \end{center}%
+  \par
+  \vskip 1.5em}
+
+% Author separator
+\newcommand{\And}{%
+  \end{tabular}%
+  \hfil%
+  \begin{tabular}[t]{c}%
+}
+
+\newcommand{\AND}{%
+  \end{tabular}%
+  \vskip 0.5em%
+  \begin{tabular}[t]{c}%
+}
+
+% Abstract
+\renewenvironment{abstract}{%
+  \centerline{\large\bfseries Abstract}%
+  \vspace{0.5em}%
+  \begin{quote}%
+}{%
+  \end{quote}%
+}
+
+\endinput

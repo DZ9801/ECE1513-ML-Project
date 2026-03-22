@@ -231,21 +231,21 @@ Figures~\ref{fig:usd_pred}--\ref{fig:cny_pred} show the actual vs.\ predicted ex
 
 \begin{figure}[h]
   \centering
-  \includegraphics[width=\textwidth]{../results/figures/USD_predictions.png}
+  \includegraphics[width=\textwidth]{figures/USD_predictions.png}
   \caption{USD/CAD: Actual vs.\ predicted exchange rates on the test set. Linear Regression (blue) tracks the actual values (black) closely, while SVR (orange) produces a near-constant prediction and MLP (green) exhibits high variance.}
   \label{fig:usd_pred}
 \end{figure}
 
 \begin{figure}[h]
   \centering
-  \includegraphics[width=\textwidth]{../results/figures/EUR_predictions.png}
+  \includegraphics[width=\textwidth]{figures/EUR_predictions.png}
   \caption{EUR/CAD: Actual vs.\ predicted exchange rates on the test set. Linear Regression again provides the best fit. SVR captures the general trend but lags behind. MLP shows unstable oscillations.}
   \label{fig:eur_pred}
 \end{figure}
 
 \begin{figure}[h]
   \centering
-  \includegraphics[width=\textwidth]{../results/figures/CNY_predictions.png}
+  \includegraphics[width=\textwidth]{figures/CNY_predictions.png}
   \caption{CNY/CAD: Actual vs.\ predicted exchange rates on the test set. The scale of CNY/CAD (approximately 0.19) is much smaller than the other pairs, which affects the relative error magnitudes.}
   \label{fig:cny_pred}
 \end{figure}
@@ -256,21 +256,21 @@ Figures~\ref{fig:usd_lc}--\ref{fig:cny_lc} show the MLP training and validation 
 
 \begin{figure}[h]
   \centering
-  \includegraphics[width=0.7\textwidth]{../results/figures/USD_learning_curve.png}
+  \includegraphics[width=0.7\textwidth]{figures/USD_learning_curve.png}
   \caption{MLP learning curve for USD/CAD. Both train and validation loss converge quickly, but a gap persists indicating some overfitting. Early stopping triggered at epoch 84.}
   \label{fig:usd_lc}
 \end{figure}
 
 \begin{figure}[h]
   \centering
-  \includegraphics[width=0.7\textwidth]{../results/figures/EUR_learning_curve.png}
+  \includegraphics[width=0.7\textwidth]{figures/EUR_learning_curve.png}
   \caption{MLP learning curve for EUR/CAD. Similar convergence pattern with early stopping at epoch 101.}
   \label{fig:eur_lc}
 \end{figure}
 
 \begin{figure}[h]
   \centering
-  \includegraphics[width=0.7\textwidth]{../results/figures/CNY_learning_curve.png}
+  \includegraphics[width=0.7\textwidth]{figures/CNY_learning_curve.png}
   \caption{MLP learning curve for CNY/CAD. The smaller scale of CNY/CAD rates leads to lower absolute loss values. Early stopping triggered at epoch 79.}
   \label{fig:cny_lc}
 \end{figure}
@@ -393,8 +393,6 @@ All figures and the results summary CSV are generated automatically by running \
 
 \newpage
 \section*{AI Usage}
-% TODO: Fill in your actual AI usage
-We used GitHub Copilot (powered by a large language model) to assist with code scaffolding, including generating boilerplate for the data loader, preprocessing pipeline, and training loops. All generated code was reviewed, tested, and modified by team members to ensure correctness. The AI tool was also used to help draft portions of this report, which were subsequently edited and verified by the team.
 
 \section*{Contest for Information Sharing}
 As part of this course, we may share selected project materials (e.g., reports, presentation slides, and presentation recordings) on the course webpage as learning resources for future students. Additionally, we may use anonymized project information for internal statistical analysis of course outcomes. Please indicate your preferences below. \textit{Your choices will not affect your grade in any way.}
