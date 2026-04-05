@@ -13,7 +13,7 @@ ECE1513-ML-Project/
 │   ├── __init__.py
 │   ├── data_loader.py         # Download & cache data from Bank of Canada API
 │   ├── preprocessing.py       # Feature engineering & train/val/test splitting
-│   ├── models.py              # Model definitions (Linear Regression, SVR, MLP)
+│   ├── models.py              # Model definitions (Linear Regression, SVR, MLP, LSTM)
 │   ├── train.py               # Training loops (sklearn + PyTorch)
 │   ├── evaluate.py            # Metrics (MAE, RMSE, R²) and plotting
 │   └── utils.py               # Seed setting, directory helpers
@@ -29,6 +29,8 @@ ECE1513-ML-Project/
 │   │   ├── USD_learning_curve.png
 │   │   ├── EUR_learning_curve.png
 │   │   ├── CNY_learning_curve.png
+│   │   ├── *_LSTM_predictions.png  # LSTM prediction plots
+│   │   ├── *_LSTM_learning_curve.png
 │   │   └── *_residuals.png    # Residual histograms for each model × currency
 │   └── results_summary.csv    # Auto-created; metrics table
 ├── report/                    # LaTeX report (Overleaf-ready)
@@ -53,24 +55,28 @@ Exchange-rate forecasting is formulated as a **supervised regression** task:
 | Model | Description |
 |---|---|
 | **Linear Regression** | Baseline – ordinary least squares via scikit-learn |
-| **SVR** | Support Vector Regression with RBF kernel (C=10, ε=0.01) |
+| **SVR** | Support Vector Regression with RBF kernel (C=10, ε=0.01), grid-search tuning |
 | **MLP** | Multi-Layer Perceptron (PyTorch) with 3 hidden layers [128, 64, 32], BatchNorm, Dropout, and early stopping |
+| **LSTM** | Long Short-Term Memory network (PyTorch) with 2 layers, hidden size 64, sequence length 21, and early stopping |
 
 ## Results
 
 | Currency | Model | MAE | RMSE | R² |
 |---|---|---|---|---|
 | USD/CAD | Linear Regression | 0.0033 | 0.0045 | 0.9707 |
-| USD/CAD | SVR | 0.0294 | 0.0369 | −0.9733 |
-| USD/CAD | MLP | 0.0539 | 0.0636 | −4.8678 |
-| EUR/CAD | Linear Regression | 0.0041 | 0.0053 | 0.9907 |
-| EUR/CAD | SVR | 0.0243 | 0.0360 | 0.5684 |
-| EUR/CAD | MLP | 0.0660 | 0.0797 | −1.1139 |
+| USD/CAD | SVR | 0.0298 | 0.0376 | −1.0490 |
+| USD/CAD | MLP | 0.0062 | 0.0073 | 0.9225 |
+| USD/CAD | LSTM | 0.0144 | 0.0168 | 0.5423 |
+| EUR/CAD | Linear Regression | 0.0041 | 0.0053 | 0.9906 |
+| EUR/CAD | SVR | 0.0269 | 0.0404 | 0.4557 |
+| EUR/CAD | MLP | 0.0116 | 0.0140 | 0.9350 |
+| EUR/CAD | LSTM | 0.0105 | 0.0139 | 0.9357 |
 | CNY/CAD | Linear Regression | 0.0004 | 0.0006 | 0.9496 |
-| CNY/CAD | SVR | 0.0023 | 0.0028 | −0.0455 |
-| CNY/CAD | MLP | 0.0021 | 0.0025 | 0.1753 |
+| CNY/CAD | SVR | 0.0007 | 0.0009 | 0.8923 |
+| CNY/CAD | MLP | 0.0005 | 0.0007 | 0.9420 |
+| CNY/CAD | LSTM | 0.0005 | 0.0007 | 0.9407 |
 
-Linear Regression achieves the best performance (R² > 0.94) across all currency pairs by leveraging strong autocorrelation in exchange-rate time series.
+Linear Regression achieves the best performance (R² > 0.94) across all currency pairs by leveraging strong autocorrelation in exchange-rate time series. The MLP and LSTM models also perform competitively, particularly on EUR/CAD and CNY/CAD. SVR with grid-search tuning shows strong improvement on CNY/CAD (R² = 0.89).
 
 ## Evaluation Metrics
 
@@ -96,7 +102,7 @@ This will:
 1. Download daily exchange-rate data from the Bank of Canada (cached to `data/`).
 2. Engineer lag, rolling, and calendar features (23 features total).
 3. Split chronologically into train (70%) / validation (15%) / test (15%).
-4. Train Linear Regression, SVR, and MLP on each currency pair.
+4. Train Linear Regression, SVR, MLP, and LSTM on each currency pair.
 5. Print metrics and save plots to `results/figures/` and a summary CSV.
 
 ## Report
@@ -111,6 +117,8 @@ All key settings live in `config.py`:
 - **Feature engineering** – adjust `LAG_DAYS`, `ROLLING_WINDOWS`, `FORECAST_HORIZON`.
 - **SVR hyperparameters** – `SVR_PARAMS`.
 - **MLP hyperparameters** – `MLP_PARAMS` (hidden sizes, learning rate, epochs, early stopping patience, etc.).
+- **LSTM hyperparameters** – `LSTM_PARAMS` (hidden size, num layers, sequence length, etc.).
+- **SVR tuning grid** – `SVR_TUNING_GRID` for hyperparameter search.
 
 ## Data Source
 
