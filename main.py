@@ -22,6 +22,7 @@ from src.evaluate import (
     results_table,
 )
 from src.utils import set_seed, ensure_dirs
+from sklearn.preprocessing import StandardScaler
 
 
 def run_pipeline() -> None:
@@ -61,7 +62,13 @@ def run_pipeline() -> None:
         X_test, y_test = get_feature_target(test_df, feature_cols)
 
         # Scale features
-        X_train_s, X_val_s, X_test_s, scaler = scale_data(X_train, X_val, X_test)
+        X_train_s, X_val_s, X_test_s, x_scaler = scale_data(X_train, X_val, X_test)
+
+        # Scale targets
+        y_scaler = StandardScaler()
+        y_train_s = y_scaler.fit_transform(y_train.reshape(-1, 1)).ravel()
+        y_val_s = y_scaler.transform(y_val.reshape(-1, 1)).ravel()
+        y_test_s = y_scaler.transform(y_test.reshape(-1, 1)).ravel()
 
         # ── 4. Train models ──────────────────────
         print("\nStep 4: Training models")
@@ -71,8 +78,9 @@ def run_pipeline() -> None:
         # Linear Regression
         print("\n  [Linear Regression]")
         lr_model = build_linear_regression()
-        train_sklearn_model(lr_model, X_train_s, y_train)
-        lr_preds = lr_model.predict(X_test_s)
+        train_sklearn_model(lr_model, X_train_s, y_train_s)
+        lr_preds_s = lr_model.predict(X_test_s)
+        lr_preds = y_scaler.inverse_transform(lr_preds_s.reshape(-1, 1)).ravel()
         m = compute_metrics(y_test, lr_preds)
         currency_metrics["Linear Regression"] = m
         predictions["Linear Regression"] = lr_preds
@@ -81,8 +89,9 @@ def run_pipeline() -> None:
         # SVR
         print("\n  [SVR]")
         svr_model = build_svr()
-        train_sklearn_model(svr_model, X_train_s, y_train)
-        svr_preds = svr_model.predict(X_test_s)
+        train_sklearn_model(svr_model, X_train_s, y_train_s)
+        svr_preds_s = svr_model.predict(X_test_s)
+        svr_preds = y_scaler.inverse_transform(svr_preds_s.reshape(-1, 1)).ravel()
         m = compute_metrics(y_test, svr_preds)
         currency_metrics["SVR"] = m
         predictions["SVR"] = svr_preds
@@ -90,8 +99,9 @@ def run_pipeline() -> None:
 
         # MLP
         print("\n  [MLP]")
-        mlp_model, history = train_mlp(X_train_s, y_train, X_val_s, y_val)
-        mlp_preds = predict_mlp(mlp_model, X_test_s)
+        mlp_model, history = train_mlp(X_train_s, y_train_s, X_val_s, y_val_s)
+        mlp_preds_s = predict_mlp(mlp_model, X_test_s)
+        mlp_preds = y_scaler.inverse_transform(mlp_preds_s.reshape(-1, 1)).ravel()
         m = compute_metrics(y_test, mlp_preds)
         currency_metrics["MLP"] = m
         predictions["MLP"] = mlp_preds
