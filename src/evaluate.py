@@ -68,14 +68,15 @@ def plot_learning_curve(
     history: dict[str, list[float]],
     currency: str,
     save_path: str | None = None,
+    model_name: str = "MLP",
 ) -> None:
-    """Plot MLP training and validation loss curves."""
+    """Plot training and validation loss curves."""
     plt.figure(figsize=(8, 4))
     plt.plot(history["train_loss"], label="Train Loss")
     plt.plot(history["val_loss"], label="Val Loss")
     plt.xlabel("Epoch")
     plt.ylabel("MSE Loss")
-    plt.title(f"MLP Learning Curve – {currency}/CAD")
+    plt.title(f"{model_name} Learning Curve – {currency}/CAD")
     plt.legend()
     plt.tight_layout()
     if save_path:

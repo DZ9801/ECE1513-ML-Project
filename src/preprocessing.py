@@ -106,3 +106,23 @@ def scale_data(
     X_val_s = scaler.transform(X_val)
     X_test_s = scaler.transform(X_test)
     return X_train_s, X_val_s, X_test_s, scaler
+
+
+def scale_target(
+    y_train: np.ndarray,
+    y_val: np.ndarray,
+    y_test: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, StandardScaler]:
+    """Fit a StandardScaler on training targets and transform all splits."""
+    scaler = StandardScaler()
+    y_train_s = scaler.fit_transform(y_train.reshape(-1, 1)).ravel()
+    y_val_s = scaler.transform(y_val.reshape(-1, 1)).ravel()
+    y_test_s = scaler.transform(y_test.reshape(-1, 1)).ravel()
+    return y_train_s, y_val_s, y_test_s, scaler
+
+
+def inverse_transform_target(
+    y: np.ndarray, scaler: StandardScaler
+) -> np.ndarray:
+    """Inverse-transform scaled targets back to original scale."""
+    return scaler.inverse_transform(y.reshape(-1, 1)).ravel()

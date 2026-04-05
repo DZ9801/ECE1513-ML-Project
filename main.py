@@ -2,7 +2,7 @@
 Main entry point – run the full pipeline:
   1. Download / load exchange-rate data
   2. Feature engineering
-  3. Train Linear Regression, SVR, MLP
+  3. Train Linear Regression, SVR (tuned), MLP, LSTM
   4. Evaluate on test set and produce figures & summary table
 """
 
@@ -10,9 +10,23 @@ import os
 
 import config
 from src.data_loader import download_all
-from src.preprocessing import build_features, split_time_series, get_feature_target, scale_data
-from src.models import build_linear_regression, build_svr
-from src.train import train_sklearn_model, train_mlp, predict_mlp
+from src.preprocessing import (
+    build_features,
+    split_time_series,
+    get_feature_target,
+    scale_data,
+    scale_target,
+    inverse_transform_target,
+)
+from src.models import build_linear_regression
+from src.train import (
+    train_sklearn_model,
+    tune_svr,
+    train_mlp,
+    predict_mlp,
+    train_lstm,
+    predict_lstm,
+)
 from src.evaluate import (
     compute_metrics,
     print_metrics,
@@ -61,14 +75,17 @@ def run_pipeline() -> None:
         X_test, y_test = get_feature_target(test_df, feature_cols)
 
         # Scale features
-        X_train_s, X_val_s, X_test_s, scaler = scale_data(X_train, X_val, X_test)
+        X_train_s, X_val_s, X_test_s, feat_scaler = scale_data(X_train, X_val, X_test)
+
+        # Scale targets (fixes feature-target scale mismatch for SVR/MLP/LSTM)
+        y_train_s, y_val_s, y_test_s, target_scaler = scale_target(y_train, y_val, y_test)
 
         # ── 4. Train models ──────────────────────
         print("\nStep 4: Training models")
         predictions: dict[str, any] = {}
         currency_metrics: dict[str, dict[str, float]] = {}
 
-        # Linear Regression
+        # Linear Regression (scale-invariant, use raw targets)
         print("\n  [Linear Regression]")
         lr_model = build_linear_regression()
         train_sklearn_model(lr_model, X_train_s, y_train)
@@ -78,24 +95,41 @@ def run_pipeline() -> None:
         predictions["Linear Regression"] = lr_preds
         print_metrics("Linear Regression", m)
 
-        # SVR
-        print("\n  [SVR]")
-        svr_model = build_svr()
-        train_sklearn_model(svr_model, X_train_s, y_train)
-        svr_preds = svr_model.predict(X_test_s)
+        # SVR (tuned, trained on scaled targets)
+        print("\n  [SVR (tuned)]")
+        svr_model, best_svr_params = tune_svr(
+            X_train_s, y_train_s, X_val_s, y_val_s
+        )
+        svr_preds_s = svr_model.predict(X_test_s)
+        svr_preds = inverse_transform_target(svr_preds_s, target_scaler)
         m = compute_metrics(y_test, svr_preds)
         currency_metrics["SVR"] = m
         predictions["SVR"] = svr_preds
         print_metrics("SVR", m)
 
-        # MLP
+        # MLP (trained on scaled targets)
         print("\n  [MLP]")
-        mlp_model, history = train_mlp(X_train_s, y_train, X_val_s, y_val)
-        mlp_preds = predict_mlp(mlp_model, X_test_s)
+        mlp_model, mlp_history = train_mlp(X_train_s, y_train_s, X_val_s, y_val_s)
+        mlp_preds_s = predict_mlp(mlp_model, X_test_s)
+        mlp_preds = inverse_transform_target(mlp_preds_s, target_scaler)
         m = compute_metrics(y_test, mlp_preds)
         currency_metrics["MLP"] = m
         predictions["MLP"] = mlp_preds
         print_metrics("MLP", m)
+
+        # LSTM (trained on scaled targets)
+        print("\n  [LSTM]")
+        seq_len = config.LSTM_PARAMS["seq_len"]
+        lstm_model, lstm_history = train_lstm(
+            X_train_s, y_train_s, X_val_s, y_val_s
+        )
+        lstm_preds_s = predict_lstm(lstm_model, X_test_s, seq_len)
+        lstm_preds = inverse_transform_target(lstm_preds_s, target_scaler)
+        # LSTM predictions are shorter due to sequence windowing — align targets
+        y_test_lstm = y_test[seq_len - 1 :]
+        m = compute_metrics(y_test_lstm, lstm_preds)
+        currency_metrics["LSTM"] = m
+        print_metrics("LSTM", m)
 
         all_metrics[currency] = currency_metrics
 
@@ -103,20 +137,43 @@ def run_pipeline() -> None:
         print("\nStep 5: Generating figures")
         test_dates = test_df["date"].reset_index(drop=True)
 
+        # Prediction plot (exclude LSTM since it has different length)
         plot_predictions(
             test_dates, y_test, predictions, currency,
             save_path=os.path.join(config.FIGURES_DIR, f"{currency}_predictions.png"),
         )
-        plot_learning_curve(
-            history, currency,
-            save_path=os.path.join(config.FIGURES_DIR, f"{currency}_learning_curve.png"),
+
+        # LSTM prediction plot (separate, with aligned dates)
+        lstm_test_dates = test_dates[seq_len - 1 :].reset_index(drop=True)
+        plot_predictions(
+            lstm_test_dates, y_test_lstm, {"LSTM": lstm_preds}, currency,
+            save_path=os.path.join(config.FIGURES_DIR, f"{currency}_LSTM_predictions.png"),
         )
+
+        # Learning curves
+        plot_learning_curve(
+            mlp_history, currency,
+            save_path=os.path.join(config.FIGURES_DIR, f"{currency}_MLP_learning_curve.png"),
+            model_name="MLP",
+        )
+        plot_learning_curve(
+            lstm_history, currency,
+            save_path=os.path.join(config.FIGURES_DIR, f"{currency}_LSTM_learning_curve.png"),
+            model_name="LSTM",
+        )
+
+        # Residual plots
         for model_name, preds in predictions.items():
             safe_name = model_name.replace(" ", "_")
             plot_residuals(
                 y_test, preds, model_name, currency,
                 save_path=os.path.join(config.FIGURES_DIR, f"{currency}_{safe_name}_residuals.png"),
             )
+        # LSTM residuals (aligned)
+        plot_residuals(
+            y_test_lstm, lstm_preds, "LSTM", currency,
+            save_path=os.path.join(config.FIGURES_DIR, f"{currency}_LSTM_residuals.png"),
+        )
 
     # ── 6. Summary table ─────────────────────────
     print("\n" + "=" * 60)

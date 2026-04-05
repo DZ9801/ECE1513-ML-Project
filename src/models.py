@@ -68,3 +68,50 @@ class ExchangeRateDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx: int):
         return self.X[idx], self.y[idx]
+
+
+# ──────────────────────────────────────────────
+# PyTorch LSTM
+# ──────────────────────────────────────────────
+
+class LSTMModel(nn.Module):
+    """LSTM for time-series regression."""
+
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_size: int = 64,
+        num_layers: int = 2,
+        dropout: float = 0.2,
+    ):
+        super().__init__()
+        self.lstm = nn.LSTM(
+            input_size=input_dim,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            batch_first=True,
+            dropout=dropout if num_layers > 1 else 0.0,
+        )
+        self.fc = nn.Linear(hidden_size, 1)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x shape: (batch, seq_len, input_dim)
+        _, (h_n, _) = self.lstm(x)
+        # h_n shape: (num_layers, batch, hidden_size) — use last layer
+        out = self.fc(h_n[-1])
+        return out.squeeze(-1)
+
+
+class SequenceDataset(torch.utils.data.Dataset):
+    """Dataset that creates sliding-window sequences for LSTM."""
+
+    def __init__(self, X: np.ndarray, y: np.ndarray, seq_len: int):
+        self.X = torch.tensor(X, dtype=torch.float32)
+        self.y = torch.tensor(y, dtype=torch.float32)
+        self.seq_len = seq_len
+
+    def __len__(self) -> int:
+        return len(self.X) - self.seq_len + 1
+
+    def __getitem__(self, idx: int):
+        return self.X[idx : idx + self.seq_len], self.y[idx + self.seq_len - 1]

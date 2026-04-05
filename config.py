@@ -55,6 +55,26 @@ MLP_PARAMS = {
     "patience": 20,  # early stopping patience
 }
 
+# LSTM (PyTorch)
+LSTM_PARAMS = {
+    "hidden_size": 64,
+    "num_layers": 2,
+    "dropout": 0.2,
+    "seq_len": 21,
+    "learning_rate": 1e-3,
+    "weight_decay": 1e-5,
+    "batch_size": 64,
+    "epochs": 200,
+    "patience": 20,
+}
+
+# SVR hyperparameter tuning grid
+SVR_TUNING_GRID = {
+    "C": [0.1, 1.0, 10.0, 100.0],
+    "epsilon": [0.001, 0.01, 0.1],
+    "gamma": ["scale", "auto"],
+}
+
 # ──────────────────────────────────────────────
 # Paths
 # ──────────────────────────────────────────────
