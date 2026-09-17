@@ -3,12 +3,15 @@ Training routines for sklearn models and the PyTorch MLP/LSTM.
 """
 
 import copy
+import os
 from itertools import product
 
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
 from torch.utils.data import DataLoader
 
@@ -145,10 +148,13 @@ def tune_svr(
     X_val: np.ndarray,
     y_val: np.ndarray,
     grid: dict | None = None,
+    results_path: str | None = None,
+    target_scaler: StandardScaler | None = None,
 ) -> tuple[SVR, dict]:
     """Grid search over SVR hyperparameters using validation set.
 
-    Returns the best model (refit on train) and the best params dict.
+    Optionally saves every parameter combination and its validation metrics.
+    Returns the best model and the best params dict.
     """
     if grid is None:
         grid = config.SVR_TUNING_GRID
@@ -159,6 +165,7 @@ def tune_svr(
     best_rmse = float("inf")
     best_params: dict = {}
     best_model: SVR | None = None
+    search_results: list[dict] = []
 
     combos = list(product(*param_values))
     print(f"  Tuning SVR: {len(combos)} combinations")
@@ -170,12 +177,51 @@ def tune_svr(
         preds = model.predict(X_val)
         rmse = np.sqrt(mean_squared_error(y_val, preds))
 
+        if target_scaler is not None:
+            y_val_eval = target_scaler.inverse_transform(
+                y_val.reshape(-1, 1)
+            ).ravel()
+            preds_eval = target_scaler.inverse_transform(
+                preds.reshape(-1, 1)
+            ).ravel()
+        else:
+            y_val_eval = y_val
+            preds_eval = preds
+
+        search_results.append(
+            {
+                **params,
+                "val_MAE": mean_absolute_error(y_val_eval, preds_eval),
+                "val_RMSE": np.sqrt(
+                    mean_squared_error(y_val_eval, preds_eval)
+                ),
+                "val_R2": r2_score(y_val_eval, preds_eval),
+                "n_support": int(model.n_support_.sum()),
+            }
+        )
+
         if rmse < best_rmse:
             best_rmse = rmse
             best_params = params
             best_model = model
 
-    print(f"  Best SVR params: {best_params} (val RMSE={best_rmse:.6f})")
+    results_df = pd.DataFrame(search_results).sort_values(
+        "val_RMSE", kind="mergesort", ignore_index=True
+    )
+    results_df.insert(0, "rank", np.arange(1, len(results_df) + 1))
+    results_df["is_best"] = results_df["rank"].eq(1)
+
+    if results_path is not None:
+        results_dir = os.path.dirname(results_path)
+        if results_dir:
+            os.makedirs(results_dir, exist_ok=True)
+        results_df.to_csv(results_path, index=False)
+        print(f"  SVR grid-search results saved to {results_path}")
+
+    print(
+        f"  Best SVR params: {best_params} "
+        f"(scaled val RMSE={best_rmse:.6f})"
+    )
     return best_model, best_params
 
 

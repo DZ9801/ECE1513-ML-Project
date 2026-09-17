@@ -33,6 +33,7 @@ from src.evaluate import (
     plot_predictions,
     plot_learning_curve,
     plot_residuals,
+    plot_svr_grid_heatmap,
     results_table,
 )
 from src.utils import set_seed, ensure_dirs
@@ -40,7 +41,13 @@ from src.utils import set_seed, ensure_dirs
 
 def run_pipeline() -> None:
     set_seed(42)
-    ensure_dirs(config.DATA_DIR, config.RESULTS_DIR, config.FIGURES_DIR)
+    ensure_dirs(
+        config.DATA_DIR,
+        config.RESULTS_DIR,
+        config.FIGURES_DIR,
+        config.SVR_GRID_RESULTS_DIR,
+        config.SVR_GRID_FIGURES_DIR,
+    )
 
     # ── 1. Download data ─────────────────────────
     print("=" * 60)
@@ -60,10 +67,10 @@ def run_pipeline() -> None:
         # ── 2. Feature engineering ────────────────
         print("\nStep 2: Feature engineering")
         df_feat = build_features(df_raw, rate_col)
-        print(f"  Features: {df_feat.shape[1] - 2} columns, {len(df_feat)} samples")
 
         # Identify feature columns (exclude date and target)
         feature_cols = [c for c in df_feat.columns if c not in {"date", "target", rate_col}]
+        print(f"  Features: {len(feature_cols)} columns, {len(df_feat)} samples")
 
         # ── 3. Train / val / test split ───────────
         print("\nStep 3: Splitting data (70/15/15)")
@@ -85,6 +92,14 @@ def run_pipeline() -> None:
         predictions: dict[str, any] = {}
         currency_metrics: dict[str, dict[str, float]] = {}
 
+        # Persistence baseline: tomorrow's rate equals today's observed rate
+        print("\n  [Persistence Baseline]")
+        persistence_preds = test_df[rate_col].to_numpy()
+        m = compute_metrics(y_test, persistence_preds)
+        currency_metrics["Persistence Baseline"] = m
+        predictions["Persistence Baseline"] = persistence_preds
+        print_metrics("Persistence Baseline", m)
+
         # Linear Regression (scale-invariant, use raw targets)
         print("\n  [Linear Regression]")
         lr_model = build_linear_regression()
@@ -97,8 +112,25 @@ def run_pipeline() -> None:
 
         # SVR (tuned, trained on scaled targets)
         print("\n  [SVR (tuned)]")
+        svr_grid_path = os.path.join(
+            config.SVR_GRID_RESULTS_DIR,
+            f"{currency}_svr_grid_search.csv",
+        )
         svr_model, best_svr_params = tune_svr(
-            X_train_s, y_train_s, X_val_s, y_val_s
+            X_train_s,
+            y_train_s,
+            X_val_s,
+            y_val_s,
+            results_path=svr_grid_path,
+            target_scaler=target_scaler,
+        )
+        plot_svr_grid_heatmap(
+            svr_grid_path,
+            currency,
+            save_path=os.path.join(
+                config.SVR_GRID_FIGURES_DIR,
+                f"{currency}_svr_grid_heatmap.png",
+            ),
         )
         svr_preds_s = svr_model.predict(X_test_s)
         svr_preds = inverse_transform_target(svr_preds_s, target_scaler)

@@ -32,6 +32,11 @@ ECE1513-ML-Project/
 │   │   ├── *_LSTM_predictions.png  # LSTM prediction plots
 │   │   ├── *_LSTM_learning_curve.png
 │   │   └── *_residuals.png    # Residual histograms for each model × currency
+│   ├── svr_grid_search/       # All SVR parameter combinations and validation metrics
+│   │   ├── USD_svr_grid_search.csv
+│   │   ├── EUR_svr_grid_search.csv
+│   │   ├── CNY_svr_grid_search.csv
+│   │   └── figures/           # C/epsilon heatmaps for validation RMSE and R²
 │   └── results_summary.csv    # Auto-created; metrics table
 ├── report/                    # LaTeX report (Overleaf-ready)
 │   ├── report.tex             # Completed NeurIPS-format report
@@ -47,14 +52,15 @@ ECE1513-ML-Project/
 
 Exchange-rate forecasting is formulated as a **supervised regression** task:
 
-- **Input**: 23 engineered features from historical daily rates (lagged observations, rolling means/stds, percentage changes, cyclical date encodings).
+- **Input**: 22 engineered features from historical daily rates (lagged observations, rolling means/stds, percentage changes, cyclical date encodings).
 - **Output**: exchange rate *h* days ahead (default *h* = 1).
 
 ## Models
 
 | Model | Description |
 |---|---|
-| **Linear Regression** | Baseline – ordinary least squares via scikit-learn |
+| **Persistence Baseline** | Predicts the next business-day rate as the current observed rate |
+| **Linear Regression** | Ordinary least squares via scikit-learn |
 | **SVR** | Support Vector Regression with RBF kernel (C=10, ε=0.01), grid-search tuning |
 | **MLP** | Multi-Layer Perceptron (PyTorch) with 3 hidden layers [128, 64, 32], BatchNorm, Dropout, and early stopping |
 | **LSTM** | Long Short-Term Memory network (PyTorch) with 2 layers, hidden size 64, sequence length 21, and early stopping |
@@ -63,20 +69,23 @@ Exchange-rate forecasting is formulated as a **supervised regression** task:
 
 | Currency | Model | MAE | RMSE | R² |
 |---|---|---|---|---|
+| USD/CAD | Persistence Baseline | 0.0032 | 0.0044 | 0.9715 |
 | USD/CAD | Linear Regression | 0.0033 | 0.0045 | 0.9707 |
 | USD/CAD | SVR | 0.0298 | 0.0376 | −1.0490 |
 | USD/CAD | MLP | 0.0062 | 0.0073 | 0.9225 |
 | USD/CAD | LSTM | 0.0144 | 0.0168 | 0.5423 |
+| EUR/CAD | Persistence Baseline | 0.0040 | 0.0052 | 0.9909 |
 | EUR/CAD | Linear Regression | 0.0041 | 0.0053 | 0.9906 |
 | EUR/CAD | SVR | 0.0269 | 0.0404 | 0.4557 |
 | EUR/CAD | MLP | 0.0116 | 0.0140 | 0.9350 |
 | EUR/CAD | LSTM | 0.0105 | 0.0139 | 0.9357 |
+| CNY/CAD | Persistence Baseline | 0.0004 | 0.0006 | 0.9503 |
 | CNY/CAD | Linear Regression | 0.0004 | 0.0006 | 0.9496 |
 | CNY/CAD | SVR | 0.0007 | 0.0009 | 0.8923 |
 | CNY/CAD | MLP | 0.0005 | 0.0007 | 0.9420 |
 | CNY/CAD | LSTM | 0.0005 | 0.0007 | 0.9407 |
 
-Linear Regression achieves the best performance (R² > 0.94) across all currency pairs by leveraging strong autocorrelation in exchange-rate time series. The MLP and LSTM models also perform competitively, particularly on EUR/CAD and CNY/CAD. SVR with grid-search tuning shows strong improvement on CNY/CAD (R² = 0.89).
+The persistence baseline achieves the best test performance across all three currency pairs, narrowly outperforming Linear Regression. This shows that the high level-prediction R² values are driven largely by strong day-to-day autocorrelation and that none of the learned models beats the simple random-walk forecast on this test period. MLP and LSTM remain competitive on EUR/CAD and CNY/CAD, while tuned SVR performs poorly on USD/CAD.
 
 ## Evaluation Metrics
 
@@ -100,10 +109,13 @@ python main.py
 
 This will:
 1. Download daily exchange-rate data from the Bank of Canada (cached to `data/`).
-2. Engineer lag, rolling, and calendar features (23 features total).
+2. Engineer lag, rolling, and calendar features (22 features total).
 3. Split chronologically into train (70%) / validation (15%) / test (15%).
-4. Train Linear Regression, SVR, MLP, and LSTM on each currency pair.
+4. Evaluate the persistence baseline and train Linear Regression, SVR, MLP, and LSTM on each currency pair.
 5. Print metrics and save plots to `results/figures/` and a summary CSV.
+
+All SVR grid-search combinations and validation metrics are saved as one CSV
+per currency in `results/svr_grid_search/`.
 
 ## Report
 

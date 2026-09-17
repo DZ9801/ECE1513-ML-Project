@@ -50,7 +50,7 @@
 
 
 \begin{abstract}
-We study next-day prediction of the Canadian dollar (CAD) exchange rate against three major currencies---USD, EUR, and CNY---using daily data from the Bank of Canada. The task is formulated as supervised regression with 23 engineered features (lagged values, rolling statistics, returns, and cyclical date encodings). We compare ordinary least-squares linear regression, support vector regression (SVR) with grid-searched hyperparameters, a multilayer perceptron (MLP), and a long short-term memory (LSTM) network. After correcting a feature--target scale mismatch via target normalization, all models achieve strong performance: linear regression leads with $R^2 > 0.94$, while the MLP and LSTM reach $R^2 > 0.93$ on EUR/CAD and CNY/CAD. We analyze the role of autocorrelation, the effect of target normalization, and the comparative strengths of each architecture.
+We study next-business-day prediction of the Canadian dollar (CAD) exchange rate against three major currencies---USD, EUR, and CNY---using daily data from the Bank of Canada. The task is formulated as supervised regression with 22 engineered features (lagged values, rolling statistics, returns, and cyclical date encodings). We compare a persistence forecast, ordinary least-squares linear regression, support vector regression (SVR) with grid-searched hyperparameters, a multilayer perceptron (MLP), and a long short-term memory (LSTM) network. The persistence forecast achieves the best test performance on all three pairs, narrowly exceeding linear regression and showing that high level-prediction $R^2$ values are largely driven by strong day-to-day autocorrelation. MLP and LSTM remain competitive on EUR/CAD and CNY/CAD, whereas tuned SVR performs poorly on USD/CAD. We analyze the role of autocorrelation, target normalization, and robust time-series validation.
 \end{abstract}
 
 \section*{Attestation of Teamwork}
@@ -61,7 +61,7 @@ All three team members contributed equally to all stages of this project, includ
 
 Exchange-rate forecasting is a central problem in computational finance, supporting hedging, trade pricing, and policy analysis~[1]. The Canadian dollar is of particular interest because Canada is a major trading partner of the United States, the European Union, and China. Traditional econometric approaches such as the random-walk model remain difficult-to-beat baselines~[2], but advances in machine learning have renewed interest in data-driven forecasting, with nonlinear models showing promise on financial time series~[3,~4].
 
-We investigate whether supervised learning methods can identify predictive structure in daily CAD exchange-rate data against three currencies (USD, EUR, CNY), comparing linear regression, SVR with grid-searched hyperparameters, an MLP, and an LSTM network.
+We investigate whether supervised learning methods can identify predictive structure in daily CAD exchange-rate data against three currencies (USD, EUR, CNY), comparing them with a persistence forecast that predicts the next rate as the latest observed rate.
 
 
 \section{Preliminaries and Problem Formulation}
@@ -76,7 +76,7 @@ where $\hat{r}_{t+1}$ is the predicted exchange rate for day $t+1$.
 
 \subsection{Feature Construction}
 
-The feature vector $\mathbf{x}_t$ consists of 23 engineered features derived from the raw exchange-rate time series:
+The feature vector $\mathbf{x}_t$ consists of 22 engineered features derived from the raw exchange-rate time series:
 
 \begin{itemize}
   \item \textbf{Lag features}: $r_{t-k}$ for $k \in \{1, 2, 3, 5, 7, 10, 14, 21\}$, providing the model with recent price history at multiple time scales.
@@ -111,12 +111,20 @@ Our system follows a modular pipeline design consisting of five stages, as illus
   \label{fig:pipeline}
 \end{figure}
 
-The pipeline comprises five modules: (1)~\textbf{Data Loader} downloads daily data from the Bank of Canada Valet API for USD/CAD, EUR/CAD, and CNY/CAD (2015--2025; 2,244 observations each); (2)~\textbf{Preprocessing} constructs 23 features (Section~2.2), performs a chronological 70/15/15 split, and applies standard scaling to both features and targets (fitted on the training set only); (3)~\textbf{Models} implements Linear Regression, SVR with grid-searched hyperparameters (scikit-learn), MLP, and LSTM (PyTorch); (4)~\textbf{Training} handles fitting with early stopping for the MLP and LSTM, and grid search for SVR; (5)~\textbf{Evaluation} computes metrics and generates figures.
+The pipeline comprises five modules: (1)~\textbf{Data Loader} loads daily data from the Bank of Canada Valet API for USD/CAD, EUR/CAD, and CNY/CAD (2017--2025; 2,244 observations each); (2)~\textbf{Preprocessing} constructs 22 features (Section~2.2), performs a chronological 70/15/15 split, and applies standard scaling to both features and targets (fitted on the training set only); (3)~\textbf{Models} implements a persistence forecast, Linear Regression, SVR with grid-searched hyperparameters (scikit-learn), MLP, and LSTM (PyTorch); (4)~\textbf{Training} handles fitting with early stopping for the MLP and LSTM, and grid search for SVR; (5)~\textbf{Evaluation} computes metrics and generates figures.
 
 
 \section{Methodology}
 
-\subsection{Linear Regression (Baseline)}
+\subsection{Persistence Baseline}
+
+Exchange rates are often well approximated over short horizons by a random walk. We therefore include a persistence forecast,
+\begin{equation}
+  \hat{r}_{t+1} = r_t,
+\end{equation}
+which uses the latest observed rate as the next-business-day prediction. A learned model should improve on this baseline to demonstrate predictive value beyond level autocorrelation.
+
+\subsection{Linear Regression}
 
 Ordinary least-squares (OLS) linear regression serves as our baseline. The model assumes a linear relationship between features and the target:
 \begin{equation}
@@ -131,6 +139,10 @@ SVR finds a function that deviates from the training targets by at most $\vareps
   K(\mathbf{x}_i, \mathbf{x}_j) = \exp\!\left(-\gamma \|\mathbf{x}_i - \mathbf{x}_j\|^2\right)
 \end{equation}
 Hyperparameters are selected via grid search over $C \in \{0.1, 1, 10, 100\}$, $\varepsilon \in \{0.001, 0.01, 0.1\}$, and $\gamma \in \{\text{scale}, \text{auto}\}$ (24 combinations), evaluated on validation-set RMSE. The implementation uses the \texttt{SVR} class from scikit-learn.
+
+\subsection{Walk-Forward Validation}
+
+The reported experiment uses one chronological training/validation/test split. A more robust extension is walk-forward validation. At fold $k$, the model is trained only on observations available up to time $t_k$ and evaluated on the immediately following block satisfying $t_k < t \leq t_{k+1}$. The training window then moves forward---either expanding from the original start date or rolling with a fixed width---and the process repeats. Metrics are aggregated across the validation blocks, so hyperparameters must perform across multiple market regimes rather than one favorable interval. This procedure preserves temporal order and closely simulates deployment because future observations never enter training. After hyperparameter selection, the model can be refit on the combined training and validation period and evaluated once on the untouched final test set. Walk-forward validation is described here as recommended future methodology and is not used for the numerical results below.
 
 \subsection{Multilayer Perceptron (MLP)}
 
@@ -187,18 +199,18 @@ where $\sigma$ is the sigmoid function and $\odot$ denotes element-wise multipli
 
 Our LSTM uses 2 stacked layers with hidden size 64 and dropout 0.2 between layers. The final hidden state $\mathbf{h}_L$ of the last layer is passed through a linear output layer to produce the scalar prediction $\hat{r}_{t+1}$. Training uses the same Adam optimizer, learning rate scheduler, and early stopping strategy as the MLP.
 
-\textbf{Libraries:} We use Python 3.14, PyTorch 2.0+ for the MLP and LSTM, scikit-learn 1.3+ for Linear Regression and SVR, pandas for data manipulation, and matplotlib for visualization.
+\textbf{Libraries:} We use Python 3.11, PyTorch 2.0+ for the MLP and LSTM, scikit-learn 1.3+ for Linear Regression and SVR, pandas for data manipulation, and matplotlib/seaborn for visualization.
 
 
 \section{Numerical Experiments}
 
 \subsection{Dataset and Experimental Setup}
 
-We use daily exchange-rate data from the Bank of Canada Valet API (January 2015--December 2025), yielding 2,244 observations per pair. After a 50-day warm-up for rolling features, 2,193 samples remain. These are split chronologically: 1,535 training (70\%), 329 validation (15\%), 329 test (15\%), covering approximately August 2024 to January 2026. Both features and targets are standardized using separate \texttt{StandardScaler} instances fitted on the training set only; predictions are inverse-transformed before computing metrics. Linear regression, being scale-invariant, is trained on raw (unscaled) targets. Seeds are fixed to 42 for reproducibility.
+We use daily exchange-rate data from the Bank of Canada Valet API (January 2017--December 2025), yielding 2,244 observations per pair. After a 50-business-day warm-up for rolling features and removal of the final row without a future target, 2,193 samples remain. These are split chronologically: 1,535 training (70\%), 329 validation (15\%), and 329 test (15\%). The test targets span September 2024 through December 2025. Both features and targets are standardized using separate \texttt{StandardScaler} instances fitted on the training set only; predictions are inverse-transformed before computing metrics. Linear regression, being scale-invariant in the target, is trained on raw targets. Seeds are fixed to 42 for reproducibility.
 
 \subsection{Results}
 
-Table~\ref{tab:results} summarizes the performance of all three models on the test set across the three currency pairs.
+Table~\ref{tab:results} summarizes test performance across the three currency pairs.
 
 \begin{table}[!t]
   \caption{Test-set performance across all currency pairs and models.}
@@ -208,16 +220,19 @@ Table~\ref{tab:results} summarizes the performance of all three models on the te
     \toprule
     Currency & Model & MAE & RMSE & $R^2$ \\
     \midrule
+    USD/CAD & Persistence       & 0.0032 & 0.0044 & 0.9715 \\
     USD/CAD & Linear Regression & 0.0033 & 0.0045 & 0.9707 \\
     USD/CAD & SVR (tuned)       & 0.0298 & 0.0376 & $-$1.0490 \\
     USD/CAD & MLP               & 0.0062 & 0.0073 & 0.9225 \\
     USD/CAD & LSTM              & 0.0144 & 0.0168 & 0.5423 \\
     \midrule
-    EUR/CAD & Linear Regression & 0.0041 & 0.0053 & 0.9907 \\
+    EUR/CAD & Persistence       & 0.0040 & 0.0052 & 0.9909 \\
+    EUR/CAD & Linear Regression & 0.0041 & 0.0053 & 0.9906 \\
     EUR/CAD & SVR (tuned)       & 0.0269 & 0.0404 & 0.4557 \\
     EUR/CAD & MLP               & 0.0116 & 0.0140 & 0.9350 \\
     EUR/CAD & LSTM              & 0.0105 & 0.0139 & 0.9357 \\
     \midrule
+    CNY/CAD & Persistence       & 0.0004 & 0.0006 & 0.9503 \\
     CNY/CAD & Linear Regression & 0.0004 & 0.0006 & 0.9496 \\
     CNY/CAD & SVR (tuned)       & 0.0007 & 0.0009 & 0.8922 \\
     CNY/CAD & MLP               & 0.0005 & 0.0007 & 0.9420 \\
@@ -225,6 +240,31 @@ Table~\ref{tab:results} summarizes the performance of all three models on the te
     \bottomrule
   \end{tabular}
 \end{table}
+
+\subsection{SVR Grid-Search Diagnostics}
+
+Figures~\ref{fig:usd_grid}--\ref{fig:cny_grid} show validation RMSE and $R^2$ over the $(C,\varepsilon)$ grid. For each cell, the better of \texttt{gamma=scale} and \texttt{gamma=auto} is selected by RMSE; the red outline marks the final validation choice. RMSE is the selection criterion, while $R^2$ provides a scale-free interpretation of the same validation errors.
+
+\begin{figure}[!t]
+  \centering
+  \includegraphics[width=\textwidth]{figures/USD_svr_grid_heatmap.png}
+  \caption{USD/CAD SVR grid-search validation metrics.}
+  \label{fig:usd_grid}
+\end{figure}
+
+\begin{figure}[!t]
+  \centering
+  \includegraphics[width=\textwidth]{figures/EUR_svr_grid_heatmap.png}
+  \caption{EUR/CAD SVR grid-search validation metrics.}
+  \label{fig:eur_grid}
+\end{figure}
+
+\begin{figure}[!t]
+  \centering
+  \includegraphics[width=\textwidth]{figures/CNY_svr_grid_heatmap.png}
+  \caption{CNY/CAD SVR grid-search validation metrics.}
+  \label{fig:cny_grid}
+\end{figure}
 
 \subsection{Prediction Plots}
 
@@ -250,7 +290,7 @@ Figure~\ref{fig:predictions} shows actual vs.\ predicted exchange rates on the t
     \caption{CNY/CAD}
     \label{fig:cny_pred}
   \end{subfigure}
-  \caption{Actual vs.\ predicted exchange rates on the test set (LR, SVR, MLP). Linear Regression (blue) tracks actual values (black) closely. With target normalization, MLP (green) now tracks the signal well; SVR (orange) still lags on USD/CAD.}
+  \caption{Actual vs.\ predicted exchange rates on the test set (Persistence, LR, SVR, and MLP). Persistence and Linear Regression track the observed levels closely, while SVR lags substantially on USD/CAD.}
   \label{fig:predictions}
 \end{figure}
 
@@ -281,9 +321,9 @@ Figure~\ref{fig:lstm_predictions} shows LSTM predictions on the test set (offset
 
 \section{Discussion}
 
-\subsection{Linear Regression Dominates}
+\subsection{Persistence Baseline Is Strongest}
 
-Linear regression achieved $R^2$ values of 0.97 (USD), 0.99 (EUR), and 0.95 (CNY). The most predictive feature is the 1-day lag ($r_{t-1}$); the linear model effectively approximates a random-walk-plus-drift model, a well-known strong baseline~[2].
+The persistence forecast achieves the lowest RMSE on all three pairs: 0.0044 for USD/CAD, 0.0052 for EUR/CAD, and 0.0006 for CNY/CAD. Linear regression is close but does not improve on persistence. Consequently, the high $R^2$ values primarily reflect strong level autocorrelation rather than evidence that the learned models extract incremental predictive information. This comparison is essential for exchange-rate forecasting, where random-walk-style baselines are historically difficult to beat~[2].
 
 \subsection{Impact of Target Normalization}
 
@@ -295,9 +335,9 @@ With target normalization, both the MLP and LSTM achieve strong results on EUR/C
 
 \section{Conclusions}
 
-Linear regression achieves $R^2 > 0.94$ on all three currency pairs by leveraging strong autocorrelation in exchange-rate series. After correcting a feature--target scale mismatch via target normalization, both the MLP and LSTM achieve $R^2 > 0.93$ on EUR/CAD and CNY/CAD, demonstrating that nonlinear models can be competitive when preprocessing is consistent. SVR benefits from grid-searched hyperparameters but remains limited by the $\varepsilon$-insensitive formulation on near-random-walk data.
+The persistence forecast achieves the best test performance on all three currency pairs, narrowly outperforming linear regression. This result shows that strong $R^2$ values for exchange-rate levels do not by themselves establish value beyond a random-walk forecast. After correcting a feature--target scale mismatch via target normalization, MLP and LSTM are competitive on EUR/CAD and CNY/CAD but still trail persistence. SVR benefits from grid-searched hyperparameters yet remains limited by the $\varepsilon$-insensitive formulation on near-random-walk data, particularly for USD/CAD.
 
-\textbf{Future work:} (a)~Transformer-based architectures for longer-range dependencies, (b)~exogenous features (interest rates, commodity prices, VIX), (c)~direction-of-change classification as an alternative task, and (d)~walk-forward cross-validation for more robust evaluation.
+\textbf{Future work:} (a)~implement expanding- or rolling-window walk-forward validation, (b)~predict returns or direction rather than only levels, (c)~add exogenous features such as interest rates, commodity prices, and VIX, and (d)~evaluate longer horizons and Transformer-based architectures.
 
 
 \section*{References}
@@ -322,7 +362,7 @@ Linear regression achieves $R^2 > 0.94$ on all three currency pairs by leveragin
 
 [8] Kingma, D.P.\ \& Ba, J.\ (2015) Adam: A method for stochastic optimization. In {\it Proc.\ 3rd International Conference on Learning Representations (ICLR)}.
 
-[9] Bank of Canada (2025) Valet API documentation. \url{https://www.bankofcanada.ca/valet/docs}.
+[9] Bank of Canada (2025) Valet API documentation.~\url{https://www.bankofcanada.ca/valet/docs}.
 
 [10] Hochreiter, S.\ \& Schmidhuber, J.\ (1997) Long short-term memory. {\it Neural Computation} {\bf 9}(8):1735--1780.
 }
@@ -373,7 +413,7 @@ Linear regression achieves $R^2 > 0.94$ on all three currency pairs by leveragin
 
 \subsection*{B. Residual Histograms}
 
-Figure~\ref{fig:residuals} shows residual distributions for all model--currency combinations. Linear Regression and MLP residuals are tightly centered around zero, while SVR exhibits wider distributions on some pairs. LSTM residuals are comparable to MLP on EUR and CNY.
+Figure~\ref{fig:residuals} shows residual distributions for all learned-model--currency combinations. Linear Regression and MLP residuals are tightly centered around zero, while SVR exhibits wider distributions on some pairs. LSTM residuals are comparable to MLP on EUR and CNY.
 
 \begin{figure}[h]
   \centering
@@ -425,7 +465,7 @@ Figure~\ref{fig:residuals} shows residual distributions for all model--currency 
     \includegraphics[width=\textwidth]{figures/CNY_LSTM_residuals.png}
     \caption{LSTM -- CNY}
   \end{subfigure}
-  \caption{Residual histograms for all model--currency pair combinations. The red dashed line marks zero residual.}
+  \caption{Residual histograms for all learned-model--currency pair combinations. The red dashed line marks zero residual.}
   \label{fig:residuals}
 \end{figure}
 

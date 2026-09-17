@@ -81,3 +81,5 @@ SVR_TUNING_GRID = {
 DATA_DIR = "data"
 RESULTS_DIR = "results"
 FIGURES_DIR = "results/figures"
+SVR_GRID_RESULTS_DIR = "results/svr_grid_search"
+SVR_GRID_FIGURES_DIR = "results/svr_grid_search/figures"
